@@ -1,11 +1,13 @@
+from functools import lru_cache
+
 from transformers import pipeline
 
 SENTIMENT_MODEL = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
 
-sentiment_classifier = pipeline(
-    "sentiment-analysis",
-    model=SENTIMENT_MODEL,
-)
+@lru_cache(maxsize=1)
+def get_sentiment_classifier():
+    """Load the sentiment pipeline once, only when it is first needed."""
+    return pipeline("sentiment-analysis", model=SENTIMENT_MODEL)
 
 
 def analyze_sentiment(text):
@@ -18,7 +20,7 @@ def analyze_sentiment(text):
     if not text:
         raise ValueError("Input text cannot be empty.")
 
-    result = sentiment_classifier(text)[0]
+    result = get_sentiment_classifier()(text)[0]
 
     return {
         "label": result["label"],

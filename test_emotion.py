@@ -1,17 +1,32 @@
-from emotion_model import analyze_emotion
+import pytest
 
-texts = [
-    "I am so excited about the weekend!",
-    "I feel terrified of losing my job.",
-    "This was the best day of my life.",
-    "I am very angry and disappointed.",
-]
+import emotion_model
 
-for text in texts:
-    result = analyze_emotion(text, top_k=3)
-    print(f"\nText: {text}")
-    print(f"Emotion: {result['label']}")
-    print(f"Confidence: {result['score']:.2%}")
-    print("Top 3 emotions:")
-    for entry in result["top_emotions"]:
-        print(f"  - {entry['label']}: {entry['score']:.2%}")
+
+def test_analyze_emotion_normalizes_and_sorts_scores(monkeypatch):
+    class FakeClassifier:
+        def __call__(self, text):
+            return [[
+                {"label": "sadness", "score": 0.1},
+                {"label": "JOY", "score": 0.8},
+                {"label": "anger", "score": 0.2},
+            ]]
+
+    emotion_model.get_emotion_classifier.cache_clear()
+    monkeypatch.setattr(emotion_model, "pipeline", lambda *args, **kwargs: FakeClassifier())
+
+    result = emotion_model.analyze_emotion("A sample", top_k=2)
+
+    assert result["label"] == "JOY"
+    assert result["score"] == 0.8
+    assert result["top_emotions"] == [
+        {"label": "joy", "score": 0.8},
+        {"label": "anger", "score": 0.2},
+    ]
+    assert len(result["all_scores"]) == 3
+
+
+@pytest.mark.parametrize("value", ["", "   ", None, 123])
+def test_analyze_emotion_rejects_invalid_input(value):
+    with pytest.raises((TypeError, ValueError)):
+        emotion_model.analyze_emotion(value)
